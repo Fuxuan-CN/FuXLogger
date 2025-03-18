@@ -48,3 +48,6 @@ class LogFormatter:
         record_copy['time'] = record_copy['timestamp'].strftime(self._datefmt)
         formatted_msg = self._format.format(**record_copy)
         return formatted_msg
+
+    def __str__(self):
+        return f'{self.__class__}(format={self._format}, dateformat={self._datefmt})'

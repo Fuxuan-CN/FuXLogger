@@ -1,26 +1,31 @@
 import asyncio
-from ..models.log_level import Level , LogLevel , addlevel
-from ..utils.interfaces import IHandler
-from ..models.log_body import LogRecord
-from ..utils import ExtractException
-from ..utils.exechook import GetStackTrace
-from ..utils.timeutil import get_local_timestamp, get_utc_timestamp
-from ..exceptions import InvalidConfigurationException
-from ..utils.type_hints import Message
-from ..exceptions import InvalidEnvironmentException
-from ..utils.log_queue import LogQueue, LogQueueEmptyException
-import threading
+import inspect
 import multiprocessing
 import os
 import sys
+import threading
 import uuid
-import inspect
+
+from .handlers import Handler
+from ..exceptions import InvalidConfigurationException
+from ..exceptions import InvalidEnvironmentException
+from ..models.log_body import LogRecord
+from ..models.log_level import Level, LogLevel, addlevel, getLevel
+from ..utils import ExtractException
+from ..utils.exechook import GetStackTrace
+from ..utils.log_queue import LogQueue, LogQueueEmptyException
+from ..utils.timeutil import get_local_timestamp, get_utc_timestamp
+from ..utils.type_hints import Message
+
 
 class Logger:
-    def __init__(self, name: str, level: LogLevel, handlers: set[IHandler] = set(), enqueue: bool = False, is_async: bool = False, only_handler: bool = False):
+    def __init__(self, name: str, handlers: list[Handler] | Handler, enqueue: bool = False,
+                 is_async: bool = False, only_handler: bool = False):
+        if type(handlers) != list:
+            handlers = [handlers]
         self.name: str = name
-        self.level: LogLevel = level
-        self.handlers: set[IHandler] = handlers
+        self.handlers: list[Handler] = handlers
+        self.handlers_num = len(self.handlers)
         self.enqueue: bool = enqueue
         self.is_async: bool = is_async
         self.uuid = uuid.uuid4()
@@ -66,17 +71,45 @@ class Logger:
         else:
             pass
 
-    def addLevel(self, level: LogLevel) -> None:
+    @staticmethod
+    def addLevel(level: LogLevel) -> None:
         addlevel(level)
 
-    def setLevel(self, level: LogLevel) -> None:
-        self.level = level
+    def setLevelThreshold(self, handler: int | str, new_threshold: LogLevel | int | float) -> None:
+        if isinstance(new_threshold,(int,float)):
+            new_threshold=LogLevel("CUSTOM",new_threshold)
+        if isinstance(handler, int):
+            self.handlers[handler].level = new_threshold
+        elif isinstance(handler, str):
+            for hd in self.handlers:
+                if hd.name == handler:
+                    hd.level = new_threshold
+                    break
+            else:
+                raise ValueError(f'Handler "{handler}" does not exist')
+        else:
+            raise TypeError(f'Arg "handler" must be a LogLevel|int|float object, not {type(handler)}')
+        self.handlers_num = len(self.handlers)
 
-    def addHandler(self, handler: IHandler) -> None:
-        self.handlers.add(handler)
+    def addHandler(self, handler: Handler) -> None:
+        self.handlers.append(handler)
+        self.handlers_num = len(self.handlers)
 
-    def removeHandler(self, handler: IHandler) -> None:
-        self.handlers.remove(handler)
+    def removeHandler(self, handler: Handler | int | str) -> None:
+        if isinstance(handler, Handler):
+            self.handlers.remove(handler)
+        elif isinstance(handler, int):
+            del self.handlers[handler]
+        elif isinstance(handler, str):
+            for hd in self.handlers:
+                if hd.name == handler:
+                    self.handlers.remove(hd)
+                    break
+            else:
+                raise ValueError(f'Handler "{handler}" does not exist')
+        else:
+            raise TypeError(f'Arg "handler" must be a Handler|int|str object, not {type(handler)}')
+        self.handlers_num = len(self.handlers)
 
     async def __async_enqueueHandler(self) -> None:
         while True:
@@ -102,16 +135,17 @@ class Logger:
                     break
                 continue
 
-    def __makeRecord(self, message: Message, level: LogLevel) -> LogRecord:
+    def __makeRecord(self, message: Message, level: LogLevel | str) -> LogRecord:
         frame = inspect.currentframe().f_back.f_back.f_back  # type: ignore
-        levelname = level.name
+        if type(level) == str:
+            level = getLevel(level)
         current_module = inspect.getmodule(frame)
         module = current_module.__name__ if current_module else "MainModule"
         return LogRecord(
             name=self.name,
             level=level,
-            levelName=levelname,
-            time="", # 留给后面格式化处理
+            levelName=level.name,
+            time="",  # 留给后面格式化处理
             timestamp=get_local_timestamp(),
             utctime=get_utc_timestamp(),
             threadid=threading.get_ident(),
@@ -120,7 +154,7 @@ class Logger:
             threadName=threading.current_thread().name,
             stack_info=GetStackTrace(5),
             file=os.path.basename(frame.f_code.co_filename),  # type: ignore
-            pathname=frame.f_code.co_filename, # type: ignore
+            pathname=frame.f_code.co_filename,  # type: ignore
             workdir=os.getcwd(),
             line=frame.f_lineno,  # type: ignore
             function=frame.f_code.co_name,  # type: ignore
@@ -128,15 +162,18 @@ class Logger:
             message=message
         )
 
-    def __log(self, level: LogLevel, message: Message) -> None:
+    def __log(self, level: LogLevel | str, message: Message) -> None:
         """
         记录一个日志的内部实现
         """
+        if self.handlers_num == 0:
+            raise ValueError("Logger needs at lease one handler")
         if self.enqueue:
             self.queue.put(self.__makeRecord(message, level))
         elif self.is_async:
             self.async_queue.put_nowait(self.__makeRecord(message, level))
         else:
+
             for handler in self.handlers:
                 handler.handle(self.__makeRecord(message, level))
 
@@ -152,7 +189,7 @@ class Logger:
         else:
             self.__log(Level.ERROR, logerr_msg)
 
-    def log(self, level: LogLevel, message: Message) -> None:
+    def log(self, level: LogLevel | str, message: Message) -> None:
         """
         记录一个 {level} 级别的日志
         """

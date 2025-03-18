@@ -7,9 +7,9 @@ from ...models.log_body import LogRecord
 
 class Handler(IHandler):
     """ Base class for all handlers """
-    def __init__(self, 
+    def __init__(self,
         name: str,
-        level: LogLevel, 
+        level: LogLevel,
         formatter: LogFormatter
     ) -> None:
         self.name = name
@@ -18,3 +18,8 @@ class Handler(IHandler):
 
     def handle(self, record: LogRecord) -> None:
         raise NotImplementedException("handle method not implemented")
+
+
+    def __str__(self):
+        return f'{self.__class__}(name={self.name}, levelThreshold={self.level}, formatter={self.formatter})'
+

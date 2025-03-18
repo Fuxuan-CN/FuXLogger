@@ -63,7 +63,12 @@ def getLevel(name: str) -> LogLevel:
     """
     获取日志等级
     """
-    return _str_to_level[name]
+    try:
+        level=_str_to_level[name]
+        return level
+    except KeyError:
+        raise ValueError(f'Level "{name}" does not exist')
+
 
 def getLevelName(level: LogLevel) -> str:
     """
