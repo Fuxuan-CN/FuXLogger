@@ -1,11 +1,12 @@
-from FuXLogger import LogFormatter , Level , LogManager , StreamHandler
 import time
 from datetime import timedelta
 
-fmt = LogFormatter("{time} | {levelName:<8} | {name}.{module}.{function} | {file}:{line:03d} | {message}")
-logger = LogManager.getLogger("test", Level.ON, fmt, enqueue=True)
-console_handler = StreamHandler("console", Level.ON, fmt, enableXMLRender=True, colorize=True)
-logger.addHandler(console_handler)
+from FuXLogger import LogManager
+
+# fmt = LogFormatter("{time} | {levelName:<8} | {name}.{module}.{function} | {file}:{line:03d} | {message}")
+logger = LogManager.getLogger("test", enqueue=True)
+# console_handler = StreamHandler("console", Level.ON, fmt, enableXMLRender=True, colorize=True)
+# logger.addHandler(console_handler)
 
 start = time.time()
 for i in range(10000):

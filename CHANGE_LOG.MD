@@ -3,6 +3,26 @@
 
 ![FuXLogger](https://media.tenor.com/A11YI0qGHRoAAAAi/fu-xuan-honkai-star-rail.gif)
 
+## branch Shasnow
+* 根据其功能，将部分 `level` 更名为 `level_threshold`.
+* 为 `Logger.log()` 增加接收字符串作为level, 前提是此前已经定义并添加了此level.
+* 增加 `handler` 数量检查(不能为0).
+* 增加从字符串转换到 `Level` 的存在性检查.
+* 移除 `Logger` 类中从未读取的属性 `level`.
+* 将 `Logger` 类中handlers的类型换为 `List`.
+* 将 `StreamHandler` 应用为默认的handler.
+* 重构 `Logger.removeHandler()` 现在也可以按索引或名称移除handler.
+* 重写 `Handler` 和 `LogFormatter` 的 `__str__()` 方法.
+* 重构 `Logger.setLevel()` 现在它是 `Logger.setLevelThreshold()`, 接收 `Handler|int|float` 类型的参数.
+* 现在一般的使用方法为
+```python
+from FuXLogger import LogManager
+
+logger=LogManager.getLogger()
+logger.info("message")
+```
+
+
 ## v0.2.7.post4 (2025-1-12 16:35)
 
 - ***下面是最新的更改***
@@ -52,28 +72,29 @@
 - ***实现异步记录日志功能,示例代码如下***
 
 ```python
-from FuXLogger import LogManager , Level , StreamHandler , LogFormatter
+from FuXLogger import LogManager, Level, StreamHandler, LogFormatter
 import asyncio
 
+
 async def main():
-    my_log_fmt = LogFormatter("{time} | {levelName:<7} | {module}:{function} | {file}:{line:02} | {message}")
-    logger = LogManager.getLogger("main",Level.ON, my_log_fmt, False, True)
+  my_log_fmt = LogFormatter("{time} | {levelName:<7} | {module}:{function} | {file}:{line:02} | {message}")
+  logger = LogManager.getLogger("main", Level.ON, my_log_fmt, False, True)
 
-    console_handler = StreamHandler("console", Level.TRACE, my_log_fmt,colorize=True, enableXMLRender=True)
+  console_handler = StreamHandler("console", Level.TRACE, my_log_fmt, colorize=True, enableXMLRender=True)
 
-    logger.addHandler(console_handler)
+  logger.addHandler(console_handler)
 
-    logger.trace("trace message")
-    logger.debug("debug message")
-    logger.info("info message")
-    logger.warning("warning message")
-    logger.error("error message")
-    logger.fatal("fatal message")
-    await asyncio.sleep(1)
+  logger.trace("trace message")
+  logger.debug("debug message")
+  logger.info("info message")
+  logger.warning("warning message")
+  logger.error("error message")
+  logger.fatal("fatal message")
+  await asyncio.sleep(1)
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+  asyncio.run(main())
 ```
 
 ## v0.1.0 (2024-9-24)
